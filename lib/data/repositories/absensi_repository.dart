@@ -8,7 +8,10 @@ class AbsensiRepository {
   /// device ini dan diunggah sebagai multipart. Objek yang dikembalikan
   /// membawa foto_path hasil server (URL relatif), bukan path lokal --
   /// karena itu method ini mengembalikan Absensi penuh, bukan cuma id.
-  Future<Absensi> insert(Absensi absensi) async {
+  ///
+  /// Server menghitung ulang jarak dan menentukan status sendiri; [isMocked]
+  /// dikirim agar server juga menolak posisi dari aplikasi Fake GPS.
+  Future<Absensi> insert(Absensi absensi, {bool isMocked = false}) async {
     final fields = <String, String>{
       'spt_id': '${absensi.sptId}',
       'pegawai_id': '${absensi.pegawaiId}',
@@ -19,6 +22,7 @@ class AbsensiRepository {
       'jarak_meter': '${absensi.jarakMeter}',
       'face_similarity': '${absensi.faceSimilarity}',
       'status': absensi.status.dbValue,
+      'is_mocked': '$isMocked',
     };
     final hasLocalFoto = absensi.fotoPath != null && absensi.fotoPath!.isNotEmpty;
     final row = await ApiClient.instance.multipart(

@@ -129,7 +129,7 @@ class AbsensiService {
     // insert() mengembalikan objek penuh (bukan cuma id) karena foto_path
     // yang dikembalikan server adalah URL hasil upload, beda dari fotoPath
     // lokal yang dikirim di atas.
-    return _absensiRepository.insert(absensi);
+    return _absensiRepository.insert(absensi, isMocked: location.isMocked);
   }
 
   void dispose() {

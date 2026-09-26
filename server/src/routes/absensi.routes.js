@@ -1,5 +1,8 @@
 const router = require('express').Router();
+const fs = require('fs');
 const db = require('../db/connection');
+const config = require('../config');
+const { distanceMeter } = require('../utils/geo');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { makeUploader, publicPath } = require('../middleware/upload');
 const asyncHandler = require('../utils/asyncHandler');
@@ -48,11 +51,51 @@ router.get('/has-valid', asyncHandler(async (req, res) => {
   res.json({ hasValid: !!row });
 }));
 
-router.post('/', upload.single('foto'), asyncHandler(async (req, res) => {
-  const { spt_id, pegawai_id, tipe, waktu, latitude, longitude, jarak_meter, face_similarity, status } = req.body;
-  if (!spt_id || !pegawai_id || !tipe || !waktu || latitude == null || longitude == null || !status) {
-    return res.status(400).json({ error: 'Data absensi tidak lengkap.' });
+// Status absensi diputuskan di sini, bukan oleh aplikasi. Yang dipercaya dari
+// aplikasi hanya data mentah (koordinat GPS, flag lokasi palsu, dan hasil
+// pencocokan wajah yang memang hanya bisa dihitung on-device); identitas
+// pegawai diambil dari token, dan jarak dihitung ulang dari lokasi SPT.
+router.post('/', requireRole('ppl'), upload.single('foto'), asyncHandler(async (req, res) => {
+  const reject = (code, error) => {
+    if (req.file) fs.unlink(req.file.path, () => {});
+    return res.status(code).json({ error });
+  };
+
+  const { spt_id, tipe, waktu, face_similarity, status: clientStatus, is_mocked } = req.body;
+  const latitude = Number(req.body.latitude);
+  const longitude = Number(req.body.longitude);
+  if (!spt_id || !tipe || !waktu || !clientStatus || req.body.latitude == null || req.body.longitude == null) {
+    return reject(400, 'Data absensi tidak lengkap.');
   }
+  if (!['check_in', 'check_out'].includes(tipe)) {
+    return reject(400, 'Tipe absensi tidak valid.');
+  }
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) ||
+      Math.abs(latitude) > 90 || Math.abs(longitude) > 180) {
+    return reject(400, 'Koordinat GPS tidak valid.');
+  }
+
+  const spt = db.prepare('SELECT * FROM spt WHERE id = ?').get(spt_id);
+  if (!spt) return reject(404, 'SPT tidak ditemukan.');
+  if (spt.pegawai_id !== req.user.id) {
+    return reject(403, 'SPT ini bukan tugas Anda.');
+  }
+  const lokasi = db.prepare('SELECT * FROM lokasi WHERE id = ?').get(spt.lokasi_id);
+  if (!lokasi) return reject(404, 'Lokasi SPT tidak ditemukan.');
+
+  const jarakMeter = distanceMeter(latitude, longitude, lokasi.latitude, lokasi.longitude);
+  const similarity = Number(face_similarity) || 0;
+  const mocked = is_mocked === 'true';
+
+  let status;
+  if (mocked || jarakMeter > lokasi.radius_meter) {
+    status = 'ditolak_lokasi';
+  } else if (clientStatus !== 'tervalidasi' || similarity < config.faceMatchThreshold) {
+    status = 'ditolak_wajah';
+  } else {
+    status = 'tervalidasi';
+  }
+
   const fotoPath = req.file ? publicPath('absensi', req.file.filename) : null;
   const info = db
     .prepare(
@@ -60,14 +103,14 @@ router.post('/', upload.single('foto'), asyncHandler(async (req, res) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
-      spt_id,
-      pegawai_id,
+      spt.id,
+      req.user.id,
       tipe,
       waktu,
-      Number(latitude),
-      Number(longitude),
-      Number(jarak_meter),
-      Number(face_similarity),
+      latitude,
+      longitude,
+      jarakMeter,
+      similarity,
       status,
       fotoPath
     );
@@ -77,7 +120,9 @@ router.post('/', upload.single('foto'), asyncHandler(async (req, res) => {
 
 router.patch('/:id/approval', requireRole('koordinator'), asyncHandler(async (req, res) => {
   const { status, catatan } = req.body;
-  if (!status) return res.status(400).json({ error: 'status wajib diisi.' });
+  if (!['disetujui', 'ditolak'].includes(status)) {
+    return res.status(400).json({ error: 'status harus disetujui atau ditolak.' });
+  }
   const existing = db.prepare('SELECT * FROM absensi WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Absensi tidak ditemukan.' });
   db.prepare(

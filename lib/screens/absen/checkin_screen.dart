@@ -154,7 +154,23 @@ class _CheckinScreenState extends State<CheckinScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (_loading) const CircularProgressIndicator(),
-          if (!_loading && result != null && !result.dalamRadius) ...[
+          if (!_loading && result != null && result.isMocked) ...[
+            const Icon(Icons.gps_off, size: 64, color: Colors.red),
+            const SizedBox(height: 16),
+            const Text(
+              'Lokasi palsu terdeteksi.\n'
+              'Matikan aplikasi Fake GPS / mock location di ponsel Anda, '
+              'lalu cek ulang lokasi.',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              onPressed: _checkLocation,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Cek Ulang Lokasi'),
+            ),
+          ],
+          if (!_loading && result != null && !result.isMocked && !result.dalamRadius) ...[
             const Icon(Icons.location_off, size: 64, color: Colors.red),
             const SizedBox(height: 16),
             Text(

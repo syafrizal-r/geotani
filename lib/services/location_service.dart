@@ -5,10 +5,16 @@ class LocationValidationResult {
   final double jarakMeter;
   final bool dalamRadius;
 
+  /// True jika Android menandai posisi ini berasal dari aplikasi pemalsu
+  /// lokasi (Fake GPS / mock location). Absen dengan posisi palsu selalu
+  /// dianggap di luar lokasi, berapa pun jaraknya.
+  final bool isMocked;
+
   const LocationValidationResult({
     required this.position,
     required this.jarakMeter,
     required this.dalamRadius,
+    required this.isMocked,
   });
 }
 
@@ -70,7 +76,8 @@ class LocationService {
     return LocationValidationResult(
       position: position,
       jarakMeter: jarak,
-      dalamRadius: jarak <= radiusMeter,
+      dalamRadius: !position.isMocked && jarak <= radiusMeter,
+      isMocked: position.isMocked,
     );
   }
 }

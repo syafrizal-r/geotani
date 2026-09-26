@@ -1,0 +1,10 @@
+node_modules/
+data/
+uploads/*
+!uploads/absensi/
+!uploads/laporan/
+uploads/absensi/*
+uploads/laporan/*
+!uploads/absensi/.gitkeep
+!uploads/laporan/.gitkeep
+.env

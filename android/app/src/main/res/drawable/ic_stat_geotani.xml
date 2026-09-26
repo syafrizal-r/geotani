@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ikon kecil notifikasi GeoTani: siluet pin lokasi dengan tunas
+     berlubang. Android hanya memakai kanal alpha ikon notifikasi, jadi
+     harus putih polos (ikon launcher berwarna akan tampil sebagai kotak). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="1024"
+    android:viewportHeight="1024">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M512,960 C400,820 212,650 212,430 A300,300 0 1,1 812,430 C812,650 624,820 512,960 Z M494,590 L494,500 C436,500 372,454 362,382 C432,374 494,410 494,470 L494,440 Q512,420 530,436 C540,370 600,336 666,344 C646,430 580,480 530,470 L530,590 Z M430,610 L594,610 A16,16 0 0,1 594,642 L430,642 A16,16 0 0,1 430,610 Z" />
+</vector>

@@ -1,0 +1,57 @@
+name: e_absensi
+description: "A new Flutter project."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  archive: ^4.0.9
+  camera: ^0.12.1
+  crypto: ^3.0.7
+  flutter:
+    sdk: flutter
+  flutter_local_notifications: ^22.3.1
+  geolocator: ^14.0.3
+  google_mlkit_face_detection: ^0.15.1
+  http: ^1.2.2
+  image: ^4.9.2
+  image_picker: ^1.2.3
+  intl: ^0.20.3
+  path: ^1.9.1
+  path_provider: ^2.1.6
+  pdf: ^3.13.0
+  permission_handler: ^13.0.2
+  provider: ^6.1.5+1
+  share_plus: ^13.3.0
+  shared_preferences: ^2.3.3
+  tflite_flutter: ^0.12.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+
+dependency_overrides:
+  # SDK Android 37 yang diminta versi permission_handler_android terbaru
+  # belum kompatibel dengan AGP di lingkungan ini (paket lokal bernama
+  # "android-37.0", bukan "android-37"). Kunci ke versi yang masih
+  # compile terhadap SDK 36 yang sudah terpasang penuh.
+  permission_handler_android: 12.1.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/models/
+
+# Ikon aplikasi GeoTani. Sumber gambar di assets/icon/ (dibuat dari SVG,
+# lihat assets/icon/README.md). Regenerasi: dart run flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon/geotani_icon.png"
+  adaptive_icon_background: "#2E7D32"
+  adaptive_icon_foreground: "assets/icon/geotani_icon_foreground.png"
+  min_sdk_android: 21

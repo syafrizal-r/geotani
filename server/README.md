@@ -1,9 +1,13 @@
 # GeoTani server
 
-Local REST API backend for the GeoTani app. Runs on a laptop on the same WiFi
-as the phones — there is **no internet/cloud hosting**, this is a LAN-only
-server. If this laptop is off or off the WiFi, the app cannot function at all
-(no offline cache is kept on purpose — see the main implementation plan).
+REST API backend for the GeoTani app. It can run on a laptop (LAN, or public
+via ngrok with `start-public.bat`) or on a paid VPS with its own domain and
+HTTPS — see [deploy/README.md](deploy/README.md). The app keeps no offline
+cache on purpose, so if the server is unreachable the app cannot function.
+
+Opening the server address in a browser (`/`) shows a live status page with
+aggregate counts only (no personal data), backed by the public
+`GET /api/status` endpoint.
 
 ## Setup
 

@@ -1,0 +1,2 @@
+# Script shell dijalankan di VPS Linux — CRLF akan membuat bash error.
+*.sh text eol=lf

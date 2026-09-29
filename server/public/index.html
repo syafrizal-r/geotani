@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GeoTani API</title>
+<meta name="description" content="Status server REST API GeoTani — sistem absensi PPL Dinas Pertanian Sumatera Utara.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232f7d4f'/%3E%3Cpath d='M16 25V13m0 0c0-4 3-7 7-7 0 4-3 7-7 7zm0 4c0-3-2.5-5.5-6-5.5 0 3 2.5 5.5 6 5.5z' stroke='white' stroke-width='2.2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #f5f7f4;
+    --surface: #ffffff;
+    --border: #dfe5dc;
+    --text: #1b261e;
+    --muted: #5d6b60;
+    --accent: #2f7d4f;
+    --accent-soft: #e3f1e7;
+    --ok: #2f7d4f;
+    --warn: #a86a00;
+    --warn-soft: #fbf0d9;
+    --bad: #b3261e;
+    --bad-soft: #fbe4e2;
+    --code-bg: #eef2ec;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111612;
+      --surface: #1a211c;
+      --border: #2c362f;
+      --text: #e4ebe5;
+      --muted: #97a59a;
+      --accent: #6fcf95;
+      --accent-soft: #1f3526;
+      --ok: #6fcf95;
+      --warn: #f0b64a;
+      --warn-soft: #3a2f16;
+      --bad: #f2877e;
+      --bad-soft: #3d1f1c;
+      --code-bg: #222b24;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 32px 16px 56px; }
+  header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 28px; }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand svg { flex: none; }
+  h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); font-size: 13.5px; margin: 2px 0 0; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 12px; border-radius: 999px; font-size: 13.5px; font-weight: 600;
+    background: var(--accent-soft); color: var(--ok);
+  }
+  .pill.down { background: var(--bad-soft); color: var(--bad); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+  .pill:not(.down) .dot { animation: pulse 2s infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
+  @media (prefers-reduced-motion: reduce) { .pill .dot { animation: none !important; } }
+
+  .meta { display: flex; flex-wrap: wrap; gap: 6px 20px; color: var(--muted); font-size: 13px; margin: -12px 0 24px; }
+  .meta b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr)); gap: 12px; margin-bottom: 28px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .tile .label { color: var(--muted); font-size: 13px; }
+  .tile .value { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; margin: 2px 0 4px; transition: color .6s; }
+  .tile .value.bump { color: var(--accent); }
+  .tile .detail { color: var(--muted); font-size: 12.5px; min-height: 1.5em; }
+
+  h2 { font-size: 15px; margin: 0 0 12px; }
+  .two > * { min-width: 0; }
+  .two { display: grid; grid-template-columns: 1fr 1.3fr; gap: 12px; margin-bottom: 28px; }
+  @media (max-width: 760px) { .two { grid-template-columns: 1fr; } }
+
+  ul.feed { list-style: none; margin: 0; padding: 0; }
+  ul.feed li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 0; border-top: 1px solid var(--border); font-size: 14px; }
+  ul.feed li:first-child { border-top: 0; }
+  .when { color: var(--muted); font-size: 12.5px; }
+  .tag { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 6px; white-space: nowrap; }
+  .tag.ok { background: var(--accent-soft); color: var(--ok); }
+  .tag.warn { background: var(--warn-soft); color: var(--warn); }
+  .tag.bad { background: var(--bad-soft); color: var(--bad); }
+  .empty { color: var(--muted); font-size: 14px; margin: 0; }
+
+  .table-scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  td { padding: 7px 8px 7px 0; border-top: 1px solid var(--border); vertical-align: top; }
+  tr:first-child td { border-top: 0; }
+  td.m { width: 64px; }
+  .method { font: 600 11.5px ui-monospace, "Cascadia Code", Consolas, monospace; }
+  .GET { color: var(--ok); } .POST { color: #2d6fd0; } .PUT, .PATCH { color: var(--warn); } .DELETE { color: var(--bad); }
+  @media (prefers-color-scheme: dark) { .POST { color: #82b1ff; } }
+  code { font: 12.5px ui-monospace, "Cascadia Code", Consolas, monospace; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+  .who { color: var(--muted); font-size: 12.5px; }
+
+  .cta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; }
+  .btn {
+    display: inline-block; padding: 10px 18px; border-radius: 8px; font-weight: 600; text-decoration: none;
+    background: var(--accent); color: var(--surface);
+  }
+  .btn.secondary { background: transparent; color: var(--accent); border: 1px solid var(--border); }
+  .btns { display: flex; flex-wrap: wrap; gap: 8px; }
+  footer { color: var(--muted); font-size: 12.5px; margin-top: 28px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <svg width="40" height="40" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#2f7d4f"/><path d="M16 25V13m0 0c0-4 3-7 7-7 0 4-3 7-7 7zm0 4c0-3-2.5-5.5-6-5.5 0 3 2.5 5.5 6 5.5z" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg>
+      <div>
+        <h1>GeoTani REST API</h1>
+        <p class="sub">Absensi PPL berbasis geolokasi &amp; pengenalan wajah · Dinas Pertanian Sumatera Utara</p>
+      </div>
+    </div>
+    <span id="pill" class="pill"><span class="dot"></span><span id="pill-text">Menghubungkan…</span></span>
+  </header>
+
+  <div class="meta">
+    <span>Waktu server: <b id="m-time">–</b></span>
+    <span>Server berjalan: <b id="m-uptime">–</b></span>
+    <span>Latensi: <b id="m-latency">–</b></span>
+    <span>Diperbarui: <b id="m-updated">–</b></span>
+  </div>
+
+  <section class="grid" aria-label="Ringkasan data">
+    <div class="card tile"><div class="label">Pegawai</div><div class="value" id="t-pegawai">–</div><div class="detail" id="d-pegawai"></div></div>
+    <div class="card tile"><div class="label">Lokasi kegiatan</div><div class="value" id="t-lokasi">–</div><div class="detail">titik koordinat + radius</div></div>
+    <div class="card tile"><div class="label">Surat Perintah Tugas</div><div class="value" id="t-spt">–</div><div class="detail" id="d-spt"></div></div>
+    <div class="card tile"><div class="label">Absensi hari ini</div><div class="value" id="t-hariini">–</div><div class="detail" id="d-hariini"></div></div>
+    <div class="card tile"><div class="label">Menunggu persetujuan</div><div class="value" id="t-menunggu">–</div><div class="detail">oleh koordinator</div></div>
+    <div class="card tile"><div class="label">Laporan kegiatan</div><div class="value" id="t-laporan">–</div><div class="detail" id="d-total"></div></div>
+  </section>
+
+  <section class="two">
+    <div class="card">
+      <h2>Aktivitas absensi terbaru</h2>
+      <ul class="feed" id="feed"><li class="empty">Memuat…</li></ul>
+    </div>
+    <div class="card">
+      <h2>Endpoint API</h2>
+      <div class="table-scroll">
+        <table>
+          <tbody id="endpoints"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="card cta">
+    <div>
+      <h2 style="margin-bottom:4px">Aplikasi Android</h2>
+      <p class="sub" style="margin:0">Satu aplikasi untuk Admin, Koordinator, PPL, dan Kepala Dinas. Semua HP terhubung ke server ini.</p>
+    </div>
+    <div class="btns">
+      <a class="btn" href="/download/GeoTani.apk">Download APK</a>
+      <a class="btn secondary" href="/download/GeoTani-32bit.apk">Versi HP 32-bit</a>
+    </div>
+  </section>
+
+  <footer>Halaman ini hanya menampilkan angka ringkasan, tanpa data pribadi. Data lengkap hanya bisa diakses lewat aplikasi setelah login.</footer>
+</div>
+
+<script>
+const ENDPOINTS = [
+  ['GET', '/api/health', 'Cek koneksi', 'publik'],
+  ['GET', '/api/status', 'Ringkasan untuk halaman ini', 'publik'],
+  ['POST', '/api/auth/login', 'Login, menghasilkan token JWT', 'publik'],
+  ['GET', '/api/auth/me', 'Profil pengguna yang login', 'login'],
+  ['GET', '/api/pegawai', 'Daftar pegawai', 'login'],
+  ['POST', '/api/pegawai', 'Tambah pegawai', 'admin'],
+  ['PUT', '/api/pegawai/:id/face-embedding', 'Simpan data wajah', 'login'],
+  ['GET', '/api/lokasi', 'Daftar lokasi kegiatan', 'login'],
+  ['POST', '/api/lokasi', 'Tambah lokasi', 'admin'],
+  ['GET', '/api/spt', 'Daftar Surat Perintah Tugas', 'login'],
+  ['POST', '/api/spt', 'Buat SPT', 'admin'],
+  ['PATCH', '/api/spt/:id/status', 'Ubah status SPT', 'admin, koordinator'],
+  ['GET', '/api/absensi', 'Riwayat absensi', 'login'],
+  ['POST', '/api/absensi', 'Check-in / check-out (foto + GPS), divalidasi server', 'ppl'],
+  ['PATCH', '/api/absensi/:id/approval', 'Setujui / tolak absensi', 'koordinator'],
+  ['GET', '/api/laporan', 'Laporan kegiatan', 'login'],
+  ['POST', '/api/laporan', 'Kirim laporan + foto', 'login'],
+];
+document.getElementById('endpoints').innerHTML = ENDPOINTS.map(([m, p, d, w]) =>
+  `<tr><td class="m"><span class="method ${m}">${m}</span></td><td><code>${p}</code><div>${d}</div></td><td class="who">${w}</td></tr>`
+).join('');
+
+const ROLE = { admin: 'admin', koordinator: 'koordinator', ppl: 'PPL', kepala_dinas: 'kepala dinas' };
+const TIPE = { check_in: 'Check-in', check_out: 'Check-out' };
+const fmtTime = new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'medium', timeStyle: 'medium' });
+
+function setVal(id, v) {
+  const el = document.getElementById(id);
+  const s = String(v);
+  if (el.textContent !== '–' && el.textContent !== s) {
+    el.classList.add('bump');
+    setTimeout(() => el.classList.remove('bump'), 2500);
+  }
+  el.textContent = s;
+}
+function text(id, s) { document.getElementById(id).textContent = s; }
+
+function durasi(detik) {
+  const h = Math.floor(detik / 86400), j = Math.floor(detik % 86400 / 3600), m = Math.floor(detik % 3600 / 60);
+  if (h) return `${h} hari ${j} jam`;
+  if (j) return `${j} jam ${m} menit`;
+  return `${m} menit`;
+}
+function relatif(iso) {
+  const s = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (s < 60) return 'baru saja';
+  if (s < 3600) return `${Math.floor(s / 60)} menit lalu`;
+  if (s < 86400) return `${Math.floor(s / 3600)} jam lalu`;
+  return `${Math.floor(s / 86400)} hari lalu`;
+}
+function statusTag(a) {
+  if (a.status === 'ditolak_lokasi') return '<span class="tag bad">Ditolak sistem · di luar radius</span>';
+  if (a.status === 'ditolak_wajah') return '<span class="tag bad">Ditolak sistem · wajah tidak cocok</span>';
+  if (a.status !== 'tervalidasi') return `<span class="tag bad">${a.status}</span>`;
+  if (a.approvalStatus === 'disetujui') return '<span class="tag ok">Disetujui koordinator</span>';
+  if (a.approvalStatus === 'ditolak') return '<span class="tag bad">Ditolak koordinator</span>';
+  return '<span class="tag warn">Menunggu persetujuan</span>';
+}
+
+async function refresh() {
+  const t0 = performance.now();
+  try {
+    const res = await fetch('/api/status', { headers: { 'ngrok-skip-browser-warning': '1' }, cache: 'no-store' });
+    if (!res.ok) throw new Error(res.status);
+    const s = await res.json();
+    const ms = Math.round(performance.now() - t0);
+
+    document.getElementById('pill').classList.remove('down');
+    text('pill-text', 'Server online');
+    text('m-time', fmtTime.format(new Date(s.serverTime)) + ' WIB');
+    text('m-uptime', durasi(s.uptimeSeconds));
+    text('m-latency', ms + ' ms');
+    text('m-updated', new Date().toLocaleTimeString('id-ID'));
+
+    setVal('t-pegawai', s.pegawai.total);
+    text('d-pegawai', Object.entries(s.pegawai.perRole).map(([r, c]) => `${c} ${ROLE[r] || r}`).join(' · ')
+      + ` · ${s.pegawai.wajahTerdaftar} wajah terdaftar`);
+    setVal('t-lokasi', s.lokasi);
+    setVal('t-spt', s.spt.total);
+    text('d-spt', Object.entries(s.spt.perStatus).map(([st, c]) => `${c} ${st}`).join(' · '));
+    setVal('t-hariini', s.absensi.checkInHariIni + s.absensi.checkOutHariIni);
+    text('d-hariini', `${s.absensi.checkInHariIni} check-in · ${s.absensi.checkOutHariIni} check-out`);
+    setVal('t-menunggu', s.absensi.menungguPersetujuan);
+    setVal('t-laporan', s.laporan);
+    text('d-total', `${s.absensi.total} absensi tercatat sejak awal`);
+
+    document.getElementById('feed').innerHTML = s.aktivitasTerbaru.length
+      ? s.aktivitasTerbaru.map(a =>
+          `<li><div>${TIPE[a.tipe] || a.tipe} PPL<div class="when">${relatif(a.waktu)} · ${fmtTime.format(new Date(a.waktu))}</div></div>${statusTag(a)}</li>`
+        ).join('')
+      : '<li class="empty">Belum ada absensi.</li>';
+  } catch (e) {
+    document.getElementById('pill').classList.add('down');
+    text('pill-text', 'Server tidak merespons');
+    text('m-latency', '–');
+  }
+}
+refresh();
+setInterval(refresh, 10000);
+</script>
+</body>
+</html>

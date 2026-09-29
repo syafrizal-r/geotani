@@ -13,6 +13,7 @@ const sptRoutes = require('./routes/spt.routes');
 const absensiRoutes = require('./routes/absensi.routes');
 const laporanRoutes = require('./routes/laporan.routes');
 const healthRoutes = require('./routes/health.routes');
+const statusRoutes = require('./routes/status.routes');
 
 if (!config.jwtSecret) {
   console.error('JWT_SECRET is not set in server/.env — refusing to start.');
@@ -23,10 +24,12 @@ const app = express();
 
 app.use(cors({ origin: true }));
 app.use(express.json());
+app.use(express.static(path.join(__dirname, '../public'))); // halaman status di `/`
 app.use('/uploads', express.static(config.uploadsDir));
 app.use('/download', express.static(path.join(__dirname, '../downloads')));
 
 app.use('/api/health', healthRoutes);
+app.use('/api/status', statusRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/pegawai', pegawaiRoutes);
 app.use('/api/lokasi', lokasiRoutes);

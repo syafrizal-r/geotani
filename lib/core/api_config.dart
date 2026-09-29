@@ -1,7 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Menyimpan alamat server GeoTani yang dipakai [ApiClient] untuk semua
-/// request. Default-nya domain ngrok (lihat [_defaultBaseUrl]); bisa
+/// request. Default-nya domain server VPS (lihat [_defaultBaseUrl]); bisa
 /// ditimpa lewat ServerSettingsScreen.
 class ApiConfig {
   ApiConfig._();
@@ -15,12 +15,11 @@ class ApiConfig {
   /// Tidak berpengaruh apa-apa kalau server diakses langsung via IP LAN.
   static const commonHeaders = {'ngrok-skip-browser-warning': 'true'};
 
-  /// Default = domain statis ngrok yang meneruskan ke server di laptop
-  /// (`ngrok http --url=gulp-composed-retiring.ngrok-free.dev 3000`), jadi HP
-  /// bisa dari jaringan mana saja (data seluler/WiFi lain) tanpa rebuild APK
-  /// tiap kali IP laptop berubah. Tetap bisa diganti manual ke IP LAN dari
-  /// Pengaturan Server kalau ngrok tidak dipakai.
-  static const _defaultBaseUrl = 'https://gulp-composed-retiring.ngrok-free.dev';
+  /// Default = domain server GeoTani di VPS (HTTPS via Caddy, lihat
+  /// server/deploy/), jadi HP bisa dari jaringan mana saja (data seluler/WiFi
+  /// lain). Tetap bisa diganti manual (IP LAN laptop atau ngrok) dari
+  /// Pengaturan Server.
+  static const _defaultBaseUrl = 'https://geotani.7sic4.online';
 
   String? _baseUrl = _defaultBaseUrl;
 

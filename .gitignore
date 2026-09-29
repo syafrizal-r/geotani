@@ -47,3 +47,4 @@ app.*.map.json
 # GeoTani: APK hasil build dibagikan lewat GitHub Releases, bukan di-commit
 server/downloads/*.apk
 /android/build/
+/dist/

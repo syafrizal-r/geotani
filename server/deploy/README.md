@@ -3,6 +3,24 @@
 Memindahkan server dari laptop (+ ngrok) ke VPS berbayar, supaya aplikasi
 tetap jalan walaupun laptop mati. Alamat akhirnya `https://<domain-anda>`.
 
+## Deployment yang sedang live
+
+Server sudah live di **https://geotani.7sic4.online**, di-hosting di VPS
+bersama (bukan VPS khusus geotani) yang juga menjalankan beberapa project lain.
+Karena itu, deployment-nya **tidak** memakai `setup-vps.sh` di bawah (script itu
+memasang Caddy + systemd untuk VPS kosong) — dipakai pola berikut, menyesuaikan
+Apache yang sudah terpasang di VPS tersebut untuk project lain:
+
+- Path: `/var/www/geotani` (bukan `/opt/geotani`)
+- Proses: **pm2** nama `geotani` (bukan systemd), interpreter `/opt/node24/bin/node`
+- Port lokal: **3011** (proxy lewat Apache, tidak dibuka langsung ke publik)
+- Reverse proxy: vhost Apache `ProxyPass`/`ProxyPassReverse`, SSL via certbot
+
+Kalau `geotani` pindah ke VPS khusus suatu saat, langkah 1–6 di bawah tetap
+berlaku apa adanya. Selama masih di VPS bersama ini, pakai walkthrough
+**"Ada update kode? Begini caranya"** di bagian bawah file ini, bukan tabel
+"Perintah sehari-hari" versi setup-vps.sh.
+
 ## 1. Beli VPS
 
 Provider lokal (IDCloudHost, Biznet Gio, Hostinger, Jagoan Hosting, dsb.) —
@@ -77,7 +95,7 @@ tanpa install ulang: **Pengaturan Server** di layar login → isi alamat baru.
 
 Setelah itu ngrok dan server di laptop tidak dibutuhkan lagi.
 
-## Perintah sehari-hari (di VPS)
+## Perintah sehari-hari (VPS khusus, hasil `setup-vps.sh`)
 
 | Keperluan | Perintah |
 |---|---|
@@ -91,3 +109,36 @@ Setelah itu ngrok dan server di laptop tidak dibutuhkan lagi.
 Database ada di `/opt/geotani/server/data/geotani.db`, foto di
 `/opt/geotani/server/uploads/`. Backup harian hanya mencakup database; foto
 sebaiknya sesekali diunduh (`scp -r root@<IP>:/opt/geotani/server/uploads .`).
+
+## Ada update kode? Begini caranya (VPS bersama, deployment yang live sekarang)
+
+Berlaku untuk deployment aktual di `geotani.7sic4.online` (bukan VPS khusus di
+atas). Setelah perubahan di-`git push` ke GitHub:
+
+1. **SSH ke VPS**: `ssh root@187.77.115.141`
+2. **Jalankan script update**:
+   ```
+   bash /var/www/geotani/server/deploy/update.sh
+   ```
+   Script ini melakukan: `git pull --ff-only` → `npm ci --omit=dev` (pakai
+   Node 24 di `/opt/node24`) → `pm2 restart geotani` → cek `/api/health`.
+   Kalau semua lancar, output terakhirnya `{"status":"ok"}  <- server OK`.
+3. **Kalau ada kolom/tabel baru di `src/db/schema.js`**: cek dulu sebelum
+   restart. `CREATE TABLE IF NOT EXISTS` otomatis kebentuk untuk tabel baru,
+   tapi **kolom baru di tabel yang sudah ada tidak otomatis ditambahkan** ke
+   `data/geotani.db` yang sudah berjalan (beda dari migration Laravel) — perlu
+   `ALTER TABLE ... ADD COLUMN ...` manual dulu lewat sqlite3 CLI atau
+   endpoint one-off, baru jalankan `update.sh`.
+4. **Kalau ada perubahan di `lib/` (kode Flutter/app-nya)**: langkah di atas
+   TIDAK cukup — itu hanya update server. Perlu build ulang APK
+   (`flutter build apk --release`) dan redistribusi ke device (lihat langkah 6
+   di atas / update APK di `server/downloads/`).
+5. **Verifikasi manual dari luar** (opsional, kalau mau lebih yakin):
+   ```
+   curl -s https://geotani.7sic4.online/api/health
+   ```
+   harus balas `{"status":"ok"}`.
+
+Kalau `update.sh` gagal di tengah jalan (mis. `git pull` conflict), jangan
+`git reset --hard` di server tanpa cek dulu — kemungkinan ada perubahan lokal
+tidak sengaja di server (`git status` dulu untuk lihat apa yang beda).

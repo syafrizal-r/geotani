@@ -6,8 +6,11 @@ const db = require('../db/connection');
 // foto — karena bisa dibuka siapa saja yang tahu alamat server.
 const startedAt = new Date();
 
-// Semua perbandingan "hari ini" pakai WIB (UTC+7); kolom `waktu` disimpan UTC.
+// "Hari ini" dihitung dalam WIB. Aplikasi mengirim `waktu` sebagai jam lokal
+// HP tanpa zona (DateTime.toIso8601String(), mis. 2026-09-29T08:05:00.000),
+// jadi hanya nilai yang berakhiran Z/offset yang perlu digeser ke WIB.
 const WIB = "'+7 hours'";
+const tanggalWib = `CASE WHEN waktu LIKE '%Z' OR waktu LIKE '%+__:__' THEN date(waktu, ${WIB}) ELSE date(waktu) END`;
 
 router.get('/', (req, res) => {
   const count = (sql) => db.prepare(sql).get().c;
@@ -21,7 +24,7 @@ router.get('/', (req, res) => {
     sptPerStatus[r.status] = r.c;
   }
 
-  const hariIni = `date(waktu, ${WIB}) = date('now', ${WIB})`;
+  const hariIni = `${tanggalWib} = date('now', ${WIB})`;
 
   res.json({
     status: 'ok',

@@ -155,11 +155,12 @@
 
   <section class="card cta">
     <div>
-      <h2 style="margin-bottom:4px">Aplikasi Android</h2>
-      <p class="sub" style="margin:0">Satu aplikasi untuk Admin, Koordinator, PPL, dan Kepala Dinas. Semua HP terhubung ke server ini.</p>
+      <h2 style="margin-bottom:4px">Aplikasi GeoTani</h2>
+      <p class="sub" style="margin:0">PPL absen lewat aplikasi Android. Admin, Koordinator, dan Kepala Dinas bisa memakai Android atau web.</p>
     </div>
     <div class="btns">
-      <a class="btn" href="/download/GeoTani.apk">Download APK</a>
+      <a class="btn" href="/app/">Buka Aplikasi Web</a>
+      <a class="btn secondary" href="/download/GeoTani.apk">Download APK</a>
       <a class="btn secondary" href="/download/GeoTani-32bit.apk">Versi HP 32-bit</a>
     </div>
   </section>
@@ -212,8 +213,12 @@ function durasi(detik) {
   if (j) return `${j} jam ${m} menit`;
   return `${m} menit`;
 }
+// Aplikasi mengirim jam lokal WIB tanpa zona; hanya nilai ber-Z/offset yang UTC.
+function parseWaktu(s) {
+  return new Date(/Z$|[+-]\d\d:\d\d$/.test(s) ? s : s + '+07:00');
+}
 function relatif(iso) {
-  const s = (Date.now() - new Date(iso).getTime()) / 1000;
+  const s = (Date.now() - parseWaktu(iso).getTime()) / 1000;
   if (s < 60) return 'baru saja';
   if (s < 3600) return `${Math.floor(s / 60)} menit lalu`;
   if (s < 86400) return `${Math.floor(s / 3600)} jam lalu`;
@@ -257,7 +262,7 @@ async function refresh() {
 
     document.getElementById('feed').innerHTML = s.aktivitasTerbaru.length
       ? s.aktivitasTerbaru.map(a =>
-          `<li><div>${TIPE[a.tipe] || a.tipe} PPL<div class="when">${relatif(a.waktu)} · ${fmtTime.format(new Date(a.waktu))}</div></div>${statusTag(a)}</li>`
+          `<li><div>${TIPE[a.tipe] || a.tipe} PPL<div class="when">${relatif(a.waktu)} · ${fmtTime.format(parseWaktu(a.waktu))}</div></div>${statusTag(a)}</li>`
         ).join('')
       : '<li class="empty">Belum ada absensi.</li>';
   } catch (e) {

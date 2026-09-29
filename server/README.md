@@ -9,6 +9,12 @@ Opening the server address in a browser (`/`) shows a live status page with
 aggregate counts only (no personal data), backed by the public
 `GET /api/status` endpoint.
 
+`/app/` is the web app for Admin, Koordinator, and Kepala Dinas (PPL accounts
+are refused — attendance needs the Android app's camera + GPS + on-device face
+recognition). It is plain HTML/ES modules in `public/app/` with no build step,
+calling the same REST API; Leaflet and jsPDF are vendored in
+`public/app/vendor/`, and map tiles come from OpenStreetMap.
+
 ## Setup
 
 ```

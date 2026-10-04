@@ -61,9 +61,25 @@ class _LokasiFormScreenState extends State<LokasiFormScreen> {
     super.dispose();
   }
 
+  /// Koma diterima sebagai tanda desimal (kebiasaan penulisan Indonesia dan
+  /// beberapa keyboard HP), mis. "3,542498" dibaca 3.542498.
+  static double? _parseNum(String v) => double.tryParse(v.trim().replaceAll(',', '.'));
+
+  /// Pasangan "lat, lng" seperti yang disalin dari Google Maps
+  /// ("3.542498, 98.703996"). Kedua angka wajib memakai titik desimal supaya
+  /// tidak tertukar dengan satu angka berkoma desimal seperti "3,542498".
+  static final _pairPattern = RegExp(r'^\s*(-?\d+\.\d+)\s*[,;]?\s*(-?\d+\.\d+)\s*$');
+
+  void _onLatitudeChanged(String v) {
+    final match = _pairPattern.firstMatch(v);
+    if (match == null) return;
+    _latitudeController.text = match.group(1)!;
+    _longitudeController.text = match.group(2)!;
+  }
+
   String? _validateDouble(String? v, {double? min, double? max}) {
     if (v == null || v.trim().isEmpty) return 'Wajib diisi';
-    final parsed = double.tryParse(v.trim());
+    final parsed = _parseNum(v);
     if (parsed == null) return 'Harus berupa angka';
     if (min != null && parsed < min) return 'Minimal $min';
     if (max != null && parsed > max) return 'Maksimal $max';
@@ -100,9 +116,9 @@ class _LokasiFormScreenState extends State<LokasiFormScreen> {
         id: widget.existing?.id,
         nama: _namaController.text.trim(),
         alamat: _alamatController.text.trim(),
-        latitude: double.parse(_latitudeController.text.trim()),
-        longitude: double.parse(_longitudeController.text.trim()),
-        radiusMeter: double.parse(_radiusController.text.trim()),
+        latitude: _parseNum(_latitudeController.text)!,
+        longitude: _parseNum(_longitudeController.text)!,
+        radiusMeter: _parseNum(_radiusController.text)!,
       );
 
       final Lokasi saved;
@@ -157,13 +173,24 @@ class _LokasiFormScreenState extends State<LokasiFormScreen> {
               validator: (v) => (v == null || v.trim().isEmpty) ? 'Alamat wajib diisi' : null,
             ),
             const SizedBox(height: 16),
+            // Keyboard teks biasa, bukan numberWithOptions(signed: true): di
+            // Keyboard Samsung kombinasi itu memunculkan tombol gabungan ".-"
+            // yang tidak bisa mengetik titik desimal.
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: TextFormField(
                     controller: _latitudeController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                    decoration: const InputDecoration(labelText: 'Latitude', border: OutlineInputBorder()),
+                    keyboardType: TextInputType.text,
+                    autocorrect: false,
+                    enableSuggestions: false,
+                    onChanged: _onLatitudeChanged,
+                    decoration: const InputDecoration(
+                      labelText: 'Latitude',
+                      hintText: 'mis. 3.542498',
+                      border: OutlineInputBorder(),
+                    ),
                     validator: (v) => _validateDouble(v, min: -90, max: 90),
                   ),
                 ),
@@ -171,12 +198,26 @@ class _LokasiFormScreenState extends State<LokasiFormScreen> {
                 Expanded(
                   child: TextFormField(
                     controller: _longitudeController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                    decoration: const InputDecoration(labelText: 'Longitude', border: OutlineInputBorder()),
+                    keyboardType: TextInputType.text,
+                    autocorrect: false,
+                    enableSuggestions: false,
+                    decoration: const InputDecoration(
+                      labelText: 'Longitude',
+                      hintText: 'mis. 98.703996',
+                      border: OutlineInputBorder(),
+                    ),
                     validator: (v) => _validateDouble(v, min: -180, max: 180),
                   ),
                 ),
               ],
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+              child: Text(
+                'Bisa juga tempel koordinat dari Google Maps (mis. "3.542498, 98.703996") '
+                'di kolom Latitude, nanti otomatis terbagi ke dua kolom.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
             ),
             const SizedBox(height: 8),
             OutlinedButton.icon(

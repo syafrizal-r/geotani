@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../data/models/lokasi.dart';
 import '../../data/repositories/lokasi_repository.dart';
 import '../../data/repositories/spt_repository.dart';
+import 'admin_list_widgets.dart';
 import 'lokasi_form_screen.dart';
 
 /// Tab CRUD Lokasi pada modul Admin Kepegawaian.
@@ -18,6 +19,7 @@ class _LokasiListScreenState extends State<LokasiListScreen> {
   final _sptRepository = SptRepository();
 
   late Future<List<Lokasi>> _future;
+  String _query = '';
 
   @override
   void initState() {
@@ -35,22 +37,27 @@ class _LokasiListScreenState extends State<LokasiListScreen> {
   }
 
   Future<void> _openForm({Lokasi? existing}) async {
-    final saved = await Navigator.of(context).push<bool>(
+    final saved = await Navigator.of(context).push<Lokasi>(
       MaterialPageRoute(builder: (_) => LokasiFormScreen(existing: existing)),
     );
-    if (saved == true) _refresh();
+    if (saved != null) _refresh();
   }
 
   Future<void> _delete(Lokasi lokasi) async {
-    final hasSpt = await _sptRepository.existsForLokasi(lokasi.id!);
-    if (hasSpt) {
-      _showMessage('Tidak dapat menghapus "${lokasi.nama}" karena masih memiliki SPT terkait.');
-      return;
+    try {
+      final hasSpt = await _sptRepository.existsForLokasi(lokasi.id!);
+      if (hasSpt) {
+        _showMessage('Tidak dapat menghapus "${lokasi.nama}" karena masih memiliki SPT terkait.');
+        return;
+      }
+      final confirmed = await _confirmDelete(lokasi.nama);
+      if (confirmed != true) return;
+      await _lokasiRepository.delete(lokasi.id!);
+      _showMessage('Lokasi "${lokasi.nama}" dihapus.');
+      _refresh();
+    } catch (e) {
+      _showMessage(e.toString());
     }
-    final confirmed = await _confirmDelete(lokasi.nama);
-    if (confirmed != true) return;
-    await _lokasiRepository.delete(lokasi.id!);
-    _refresh();
   }
 
   Future<bool?> _confirmDelete(String nama) {
@@ -68,6 +75,7 @@ class _LokasiListScreenState extends State<LokasiListScreen> {
   }
 
   void _showMessage(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
@@ -78,56 +86,72 @@ class _LokasiListScreenState extends State<LokasiListScreen> {
         onPressed: () => _openForm(),
         child: const Icon(Icons.add),
       ),
-      body: RefreshIndicator(
-        onRefresh: _refresh,
-        child: FutureBuilder<List<Lokasi>>(
-          future: _future,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState != ConnectionState.done) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            final items = snapshot.data ?? [];
-            if (items.isEmpty) {
-              return ListView(
-                children: const [
-                  Padding(
-                    padding: EdgeInsets.all(32),
-                    child: Text('Belum ada data lokasi.', textAlign: TextAlign.center),
-                  ),
-                ],
-              );
-            }
-            return ListView.separated(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
-              itemCount: items.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 8),
-              itemBuilder: (context, index) {
-                final lokasi = items[index];
-                return Card(
-                  child: ListTile(
-                    leading: const CircleAvatar(child: Icon(Icons.place_outlined)),
-                    title: Text(lokasi.nama),
-                    subtitle: Text('${lokasi.alamat}\nRadius: ${lokasi.radiusMeter.toStringAsFixed(0)} m'),
-                    isThreeLine: true,
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit_outlined),
-                          onPressed: () => _openForm(existing: lokasi),
+      body: Column(
+        children: [
+          AdminSearchField(
+            hintText: 'Cari nama atau alamat lokasi',
+            onChanged: (v) => setState(() => _query = v.trim().toLowerCase()),
+          ),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _refresh,
+              child: FutureBuilder<List<Lokasi>>(
+                future: _future,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState != ConnectionState.done) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.hasError) {
+                    return AdminListMessage(
+                      'Gagal memuat data lokasi:\n${snapshot.error}',
+                      onRetry: _refresh,
+                    );
+                  }
+                  final all = snapshot.data ?? [];
+                  final items = all
+                      .where((l) => _query.isEmpty || '${l.nama} ${l.alamat}'.toLowerCase().contains(_query))
+                      .toList();
+                  if (items.isEmpty) {
+                    return AdminListMessage(all.isEmpty ? 'Belum ada data lokasi.' : 'Tidak ada lokasi yang cocok.');
+                  }
+                  return ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 88),
+                    itemCount: items.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 8),
+                    itemBuilder: (context, index) {
+                      final lokasi = items[index];
+                      return Card(
+                        child: ListTile(
+                          leading: const CircleAvatar(child: Icon(Icons.place_outlined)),
+                          title: Text(lokasi.nama),
+                          subtitle: Text(
+                            '${lokasi.alamat}\n'
+                            '${lokasi.latitude.toStringAsFixed(6)}, ${lokasi.longitude.toStringAsFixed(6)}'
+                            ' · Radius ${lokasi.radiusMeter.toStringAsFixed(0)} m',
+                          ),
+                          isThreeLine: true,
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.edit_outlined),
+                                onPressed: () => _openForm(existing: lokasi),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline),
+                                onPressed: () => _delete(lokasi),
+                              ),
+                            ],
+                          ),
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline),
-                          onPressed: () => _delete(lokasi),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            );
-          },
-        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

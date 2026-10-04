@@ -67,10 +67,48 @@ class _ApprovalDetailScreenState extends State<ApprovalDetailScreen> {
       // AbsensiPollService, yang mendeteksi perubahan ini lewat polling di
       // device PPL dan memicu notifikasinya sendiri di sana.
       if (!mounted) return;
+      await _showResultDialog(status);
+      if (!mounted) return;
       Navigator.of(context).pop();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal menyimpan keputusan: $e')),
+        );
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  /// Konfirmasi yang harus ditutup sendiri (bukan SnackBar yang mudah
+  /// terlewat) supaya koordinator yakin keputusannya sudah tersimpan.
+  Future<void> _showResultDialog(ApprovalStatus status) {
+    final approved = status == ApprovalStatus.disetujui;
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        icon: Icon(
+          approved ? Icons.check_circle : Icons.cancel,
+          color: approved ? Colors.green : Colors.red,
+          size: 56,
+        ),
+        title: const Text('Berhasil'),
+        content: Text(
+          approved
+              ? 'Absensi ${widget.pegawai.nama} telah disetujui.'
+              : 'Absensi ${widget.pegawai.nama} telah ditolak.',
+          textAlign: TextAlign.center,
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

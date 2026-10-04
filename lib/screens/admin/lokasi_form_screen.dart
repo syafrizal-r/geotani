@@ -3,8 +3,13 @@ import 'package:flutter/material.dart';
 import '../../core/constants.dart';
 import '../../data/models/lokasi.dart';
 import '../../data/repositories/lokasi_repository.dart';
+import '../../services/api_client.dart';
+import '../../services/location_service.dart';
 
 /// Form tambah/ubah lokasi (kelompok tani/lahan) untuk modul CRUD Admin Kepegawaian.
+///
+/// Saat berhasil, layar ditutup dengan [Lokasi] yang tersimpan (termasuk id
+/// barunya) supaya pemanggil seperti form SPT bisa langsung memilihnya.
 class LokasiFormScreen extends StatefulWidget {
   final Lokasi? existing;
 
@@ -17,6 +22,7 @@ class LokasiFormScreen extends StatefulWidget {
 class _LokasiFormScreenState extends State<LokasiFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _lokasiRepository = LokasiRepository();
+  final _locationService = LocationService();
 
   final _namaController = TextEditingController();
   final _alamatController = TextEditingController();
@@ -25,6 +31,7 @@ class _LokasiFormScreenState extends State<LokasiFormScreen> {
   final _radiusController = TextEditingController();
 
   bool _saving = false;
+  bool _locating = false;
   String? _error;
 
   bool get _isEdit => widget.existing != null;
@@ -63,6 +70,23 @@ class _LokasiFormScreenState extends State<LokasiFormScreen> {
     return null;
   }
 
+  Future<void> _ambilTitikKoordinat() async {
+    setState(() => _locating = true);
+    try {
+      final position = await _locationService.getCurrentPosition();
+      setState(() {
+        _latitudeController.text = position.latitude.toStringAsFixed(6);
+        _longitudeController.text = position.longitude.toStringAsFixed(6);
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    } finally {
+      if (mounted) setState(() => _locating = false);
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -81,13 +105,25 @@ class _LokasiFormScreenState extends State<LokasiFormScreen> {
         radiusMeter: double.parse(_radiusController.text.trim()),
       );
 
+      final Lokasi saved;
       if (_isEdit) {
         await _lokasiRepository.update(lokasi);
+        saved = lokasi;
       } else {
-        await _lokasiRepository.insert(lokasi);
+        final id = await _lokasiRepository.insert(lokasi);
+        saved = Lokasi(
+          id: id,
+          nama: lokasi.nama,
+          alamat: lokasi.alamat,
+          latitude: lokasi.latitude,
+          longitude: lokasi.longitude,
+          radiusMeter: lokasi.radiusMeter,
+        );
       }
       if (!mounted) return;
-      Navigator.of(context).pop(true);
+      Navigator.of(context).pop(saved);
+    } on ApiException catch (e) {
+      setState(() => _error = e.message);
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {
@@ -142,12 +178,25 @@ class _LokasiFormScreenState extends State<LokasiFormScreen> {
                 ),
               ],
             ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: _locating ? null : _ambilTitikKoordinat,
+              icon: _locating
+                  ? const SizedBox(
+                      height: 16,
+                      width: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.my_location),
+              label: Text(_locating ? 'Mengambil titik koordinat...' : 'Ambil Titik Koordinat Saat Ini'),
+            ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _radiusController,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               decoration: const InputDecoration(
                 labelText: 'Radius Geofence (meter)',
+                helperText: 'PPL hanya bisa absen jika berada di dalam radius ini.',
                 border: OutlineInputBorder(),
               ),
               validator: (v) => _validateDouble(v, min: 1),

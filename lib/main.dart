@@ -58,7 +58,12 @@ class _RootScreenState extends State<_RootScreen> {
 
   Future<void> _bootstrap() async {
     if (ApiConfig.instance.isConfigured) {
-      await context.read<AuthProvider>().tryAutoLogin();
+      try {
+        await context.read<AuthProvider>().tryAutoLogin().timeout(const Duration(seconds: 15));
+      } catch (_) {
+        // Server tidak terjangkau / timeout: jangan tertahan di spinner,
+        // tampilkan LoginScreen (token tetap disimpan untuk percobaan berikutnya).
+      }
     }
     if (mounted) setState(() => _checkingAuth = false);
   }

@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../../core/constants.dart';
+import '../../data/models/lokasi.dart';
 import '../../data/models/pegawai.dart';
 import '../../data/models/spt.dart';
-import '../../data/repositories/pegawai_repository.dart';
 import '../../data/repositories/lokasi_repository.dart';
-import '../../data/models/lokasi.dart';
+import '../../data/repositories/pegawai_repository.dart';
 import '../../data/repositories/spt_repository.dart';
 import '../../services/api_client.dart';
-import '../../services/location_service.dart';
+import 'lokasi_form_screen.dart';
 
 /// Form tambah/ubah SPT (Surat Perintah Tugas) untuk modul CRUD Admin Kepegawaian.
 ///
-/// Lokasi tujuan diisi manual (bukan memilih dari lokasi yang sudah ada) dan
-/// titik koordinatnya bisa langsung diambil dari GPS perangkat.
+/// Lokasi tujuan dipilih dari data di tab Lokasi (koordinat dan radius ikut
+/// dari sana). Tombol "Lokasi Baru" membuka form lokasi tanpa meninggalkan
+/// form SPT, lalu lokasi barunya langsung terpilih.
 class SptFormScreen extends StatefulWidget {
   final Spt? existing;
 
@@ -29,26 +29,22 @@ class _SptFormScreenState extends State<SptFormScreen> {
   final _sptRepository = SptRepository();
   final _pegawaiRepository = PegawaiRepository();
   final _lokasiRepository = LokasiRepository();
-  final _locationService = LocationService();
 
   final _nomorSptController = TextEditingController();
   final _agendaController = TextEditingController();
-  final _lokasiNamaController = TextEditingController();
-  final _latitudeController = TextEditingController();
-  final _longitudeController = TextEditingController();
   final _dateFormat = DateFormat('d MMM yyyy, HH:mm', 'id_ID');
 
-  late Future<(List<Pegawai>, Lokasi?)> _optionsFuture;
-  bool _prefilled = false;
-  double? _existingRadius;
+  late Future<void> _optionsFuture;
+  List<Pegawai> _pplList = [];
+  List<Lokasi> _lokasiList = [];
 
   int? _pegawaiId;
+  int? _lokasiId;
   late DateTime _tanggalMulai;
   late DateTime _tanggalSelesai;
   late SptStatus _status;
 
   bool _saving = false;
-  bool _locating = false;
   String? _error;
 
   bool get _isEdit => widget.existing != null;
@@ -59,6 +55,7 @@ class _SptFormScreenState extends State<SptFormScreen> {
     _optionsFuture = _loadOptions();
     final existing = widget.existing;
     _pegawaiId = existing?.pegawaiId;
+    _lokasiId = existing?.lokasiId;
     _tanggalMulai = existing?.tanggalMulai ?? DateTime.now();
     _tanggalSelesai = existing?.tanggalSelesai ?? DateTime.now().add(const Duration(hours: 8));
     _status = existing?.status ?? SptStatus.menunggu;
@@ -68,31 +65,21 @@ class _SptFormScreenState extends State<SptFormScreen> {
     }
   }
 
-  Future<(List<Pegawai>, Lokasi?)> _loadOptions() async {
-    final pegawai = await _pegawaiRepository.findAll();
-    final ppl = pegawai.where((p) => p.role == PegawaiRole.ppl).toList();
-    final existing = widget.existing;
-    final existingLokasi = existing == null ? null : await _lokasiRepository.findById(existing.lokasiId);
-    return (ppl, existingLokasi);
+  Future<void> _loadOptions() async {
+    final (pegawai, lokasi) = await (_pegawaiRepository.findAll(), _lokasiRepository.findAll()).wait;
+    _pplList = pegawai.where((p) => p.role == PegawaiRole.ppl).toList();
+    _lokasiList = lokasi;
+    // Pilihan lama yang datanya sudah tidak ada tidak boleh jadi nilai
+    // dropdown (DropdownButton akan assert), jadi dikosongkan.
+    if (!_pplList.any((p) => p.id == _pegawaiId)) _pegawaiId = null;
+    if (!_lokasiList.any((l) => l.id == _lokasiId)) _lokasiId = null;
   }
 
   @override
   void dispose() {
     _nomorSptController.dispose();
     _agendaController.dispose();
-    _lokasiNamaController.dispose();
-    _latitudeController.dispose();
-    _longitudeController.dispose();
     super.dispose();
-  }
-
-  String? _validateDouble(String? v, {double? min, double? max}) {
-    if (v == null || v.trim().isEmpty) return 'Wajib diisi';
-    final parsed = double.tryParse(v.trim());
-    if (parsed == null) return 'Harus berupa angka';
-    if (min != null && parsed < min) return 'Minimal $min';
-    if (max != null && parsed > max) return 'Maksimal $max';
-    return null;
   }
 
   Future<void> _pickDateTime({required bool isMulai}) async {
@@ -119,27 +106,21 @@ class _SptFormScreenState extends State<SptFormScreen> {
     });
   }
 
-  Future<void> _ambilTitikKoordinat() async {
-    setState(() => _locating = true);
-    try {
-      final position = await _locationService.getCurrentPosition();
-      setState(() {
-        _latitudeController.text = position.latitude.toStringAsFixed(6);
-        _longitudeController.text = position.longitude.toStringAsFixed(6);
-      });
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-      }
-    } finally {
-      if (mounted) setState(() => _locating = false);
-    }
+  Future<void> _tambahLokasiBaru() async {
+    final lokasi = await Navigator.of(context).push<Lokasi>(
+      MaterialPageRoute(builder: (_) => const LokasiFormScreen()),
+    );
+    if (lokasi == null) return;
+    setState(() {
+      _lokasiList = [..._lokasiList, lokasi]..sort((a, b) => a.nama.compareTo(b.nama));
+      _lokasiId = lokasi.id;
+    });
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_pegawaiId == null) {
-      setState(() => _error = 'PPL wajib dipilih');
+    if (_pegawaiId == null || _lokasiId == null) {
+      setState(() => _error = _pegawaiId == null ? 'PPL wajib dipilih' : 'Lokasi tujuan wajib dipilih');
       return;
     }
     if (!_tanggalSelesai.isAfter(_tanggalMulai)) {
@@ -153,29 +134,11 @@ class _SptFormScreenState extends State<SptFormScreen> {
     });
 
     try {
-      final lokasiNama = _lokasiNamaController.text.trim();
-      final lokasi = Lokasi(
-        id: widget.existing?.lokasiId,
-        nama: lokasiNama,
-        alamat: lokasiNama,
-        latitude: double.parse(_latitudeController.text.trim()),
-        longitude: double.parse(_longitudeController.text.trim()),
-        radiusMeter: _existingRadius ?? AppConstants.defaultRadiusMeter,
-      );
-
-      final int lokasiId;
-      if (_isEdit) {
-        await _lokasiRepository.update(lokasi);
-        lokasiId = widget.existing!.lokasiId;
-      } else {
-        lokasiId = await _lokasiRepository.insert(lokasi);
-      }
-
       final spt = Spt(
         id: widget.existing?.id,
         nomorSpt: _nomorSptController.text.trim(),
         pegawaiId: _pegawaiId!,
-        lokasiId: lokasiId,
+        lokasiId: _lokasiId!,
         agenda: _agendaController.text.trim(),
         tanggalMulai: _tanggalMulai,
         tanggalSelesai: _tanggalSelesai,
@@ -204,20 +167,34 @@ class _SptFormScreenState extends State<SptFormScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(_isEdit ? 'Ubah SPT' : 'Tambah SPT')),
-      body: FutureBuilder<(List<Pegawai>, Lokasi?)>(
+      body: FutureBuilder<void>(
         future: _optionsFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
             return const Center(child: CircularProgressIndicator());
           }
-          final (pplList, existingLokasi) = snapshot.data ?? (const <Pegawai>[], null);
-          if (!_prefilled && existingLokasi != null) {
-            _lokasiNamaController.text = existingLokasi.nama;
-            _latitudeController.text = existingLokasi.latitude.toString();
-            _longitudeController.text = existingLokasi.longitude.toString();
-            _existingRadius = existingLokasi.radiusMeter;
-            _prefilled = true;
+          if (snapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('Gagal memuat data PPL/lokasi:\n${snapshot.error}', textAlign: TextAlign.center),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: () => setState(() {
+                        _optionsFuture = _loadOptions();
+                      }),
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Coba lagi'),
+                    ),
+                  ],
+                ),
+              ),
+            );
           }
+          final selectedLokasi = _lokasiList.where((l) => l.id == _lokasiId).firstOrNull;
 
           return Form(
             key: _formKey,
@@ -234,10 +211,13 @@ class _SptFormScreenState extends State<SptFormScreen> {
                   initialValue: _pegawaiId,
                   isExpanded: true,
                   decoration: const InputDecoration(labelText: 'PPL', border: OutlineInputBorder()),
-                  items: pplList
+                  items: _pplList
                       .map((p) => DropdownMenuItem(
                             value: p.id,
-                            child: Text(p.nama, overflow: TextOverflow.ellipsis),
+                            child: Text(
+                              p.isEnrolled ? p.nama : '${p.nama} (belum daftar wajah)',
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ))
                       .toList(),
                   onChanged: (v) => setState(() => _pegawaiId = v),
@@ -254,55 +234,58 @@ class _SptFormScreenState extends State<SptFormScreen> {
                   ),
                   validator: (v) => (v == null || v.trim().isEmpty) ? 'Wajib diisi' : null,
                 ),
-                const SizedBox(height: 24),
-                Text(
-                  'Lokasi Tujuan',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: _lokasiNamaController,
-                  decoration: const InputDecoration(
-                    labelText: 'Lokasi Tujuan',
-                    hintText: 'mis. Kelompok Tani Sido Makmur',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Lokasi tujuan wajib diisi' : null,
-                ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: TextFormField(
-                        controller: _latitudeController,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                        decoration: const InputDecoration(labelText: 'Latitude', border: OutlineInputBorder()),
-                        validator: (v) => _validateDouble(v, min: -90, max: 90),
+                      child: DropdownButtonFormField<int>(
+                        // initialValue hanya dibaca saat field dibuat; key ikut
+                        // berubah supaya lokasi yang baru ditambahkan langsung terpilih.
+                        key: ValueKey('lokasi-$_lokasiId-${_lokasiList.length}'),
+                        initialValue: _lokasiId,
+                        isExpanded: true,
+                        decoration: const InputDecoration(labelText: 'Lokasi Tujuan', border: OutlineInputBorder()),
+                        hint: Text(_lokasiList.isEmpty ? 'Belum ada lokasi' : 'Pilih lokasi'),
+                        items: _lokasiList
+                            .map((l) => DropdownMenuItem(
+                                  value: l.id,
+                                  child: Text(l.nama, overflow: TextOverflow.ellipsis),
+                                ))
+                            .toList(),
+                        onChanged: (v) => setState(() => _lokasiId = v),
+                        validator: (v) => v == null ? 'Lokasi tujuan wajib dipilih' : null,
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _longitudeController,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                        decoration: const InputDecoration(labelText: 'Longitude', border: OutlineInputBorder()),
-                        validator: (v) => _validateDouble(v, min: -180, max: 180),
+                    const SizedBox(width: 8),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: IconButton.filledTonal(
+                        tooltip: 'Lokasi Baru',
+                        onPressed: _tambahLokasiBaru,
+                        icon: const Icon(Icons.add_location_alt_outlined),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: _locating ? null : _ambilTitikKoordinat,
-                  icon: _locating
-                      ? const SizedBox(
-                          height: 16,
-                          width: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.my_location),
-                  label: Text(_locating ? 'Mengambil titik koordinat...' : 'Ambil Titik Koordinat Saat Ini'),
-                ),
+                if (selectedLokasi != null)
+                  Card(
+                    margin: const EdgeInsets.only(top: 8),
+                    child: ListTile(
+                      dense: true,
+                      leading: const Icon(Icons.place_outlined),
+                      title: Text(selectedLokasi.alamat),
+                      subtitle: Text(
+                        '${selectedLokasi.latitude.toStringAsFixed(6)}, ${selectedLokasi.longitude.toStringAsFixed(6)}'
+                        ' · Radius ${selectedLokasi.radiusMeter.toStringAsFixed(0)} m',
+                      ),
+                    ),
+                  )
+                else if (_lokasiList.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8),
+                    child: Text('Tambahkan lokasi dulu di tab Lokasi, atau tekan tombol + di samping.'),
+                  ),
                 const SizedBox(height: 20),
                 ListTile(
                   contentPadding: EdgeInsets.zero,

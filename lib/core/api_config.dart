@@ -15,8 +15,8 @@ class ApiConfig {
   /// Tidak berpengaruh apa-apa kalau server diakses langsung via IP LAN.
   static const commonHeaders = {'ngrok-skip-browser-warning': 'true'};
 
-  /// Default = domain server GeoTani di VPS (HTTPS via Caddy, lihat
-  /// server/deploy/), jadi HP bisa dari jaringan mana saja (data seluler/WiFi
+  /// Default = domain server GeoTani di VPS (HTTPS via Apache, lihat
+  /// server/deploy/README.md), jadi HP bisa dari jaringan mana saja (data seluler/WiFi
   /// lain). Tetap bisa diganti manual (IP LAN laptop atau ngrok) dari
   /// Pengaturan Server.
   static const _defaultBaseUrl = 'https://geotani.7sic4.online';
